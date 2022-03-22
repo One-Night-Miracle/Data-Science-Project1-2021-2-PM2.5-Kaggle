@@ -180,14 +180,12 @@ class MinimalSARIMAX():
     #############################################################################
     
     def predict(self, y, y_X=None, verbose=0):
-        y_t = y.iloc[:,0].copy()
-        y_t = y_t.to_numpy()
+        y_t = y.iloc[:,0].copy().to_numpy()
 
         if y_X is not None:
-            y_Xt = y_X.iloc[:,0].copy()
-            y_Xt = y_Xt.to_numpy()
+            y_Xt = y_X.copy().to_numpy()
 
-        diff_y_t = self.X_train.copy()
+        diff_y_t = self.y.copy()
         for i in range(1,self.d+1):
             diff_y_t[f'diff{i}'] = diff_y_t.iloc[:,[0]].diff(periods=i)
 
@@ -204,6 +202,7 @@ class MinimalSARIMAX():
             pred['pX'], x['pX'] = self.pX_prediction(y_Xt, t) if y_X is not None else ([0], [0])
             pred['d'], x['d'] = self.d_prediction(diff_y_t, t)
             pred['q'], x['q'] = self.q_prediction(y_t, Error, t)
+            
             pred['P'], x['P'] = self.P_prediction(y_t, t)
             pred['D'], x['D'] = self.D_prediction(y_t, t)
             pred['Q'], x['Q'] = self.Q_prediction(y_t, Error, t)
