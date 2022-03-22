@@ -185,7 +185,7 @@ class MinimalSARIMAX():
         if y_X is not None:
             y_Xt = y_X.copy().to_numpy()
 
-        diff_y_t = self.y.copy()
+        diff_y_t = y.copy()
         for i in range(1,self.d+1):
             diff_y_t[f'diff{i}'] = diff_y_t.iloc[:,[0]].diff(periods=i)
 
