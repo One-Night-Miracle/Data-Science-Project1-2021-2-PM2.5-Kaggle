@@ -36,14 +36,14 @@ def toDF(pm25_filename, temp_filename, wind_filename):
     # wind_df.index = pd.DatetimeIndex(wind_df.index)
 
     pm25_df['copy_index'] = pm25_df.index
-    df = pd.merge(pm25_df, temp_df, left_index=True, right_index=True)
-    df = pd.merge(df, wind_df, left_index=True, right_index=True)
+    df = pd.merge(pm25_df, temp_df, left_index=True, right_index=True, how='left')
+    df = pd.merge(df, wind_df, left_index=True, right_index=True, how='left')
 
     df = df[['Temp','WindSpeed','WindDir','PM25']]
 
     # padding first and last indices
-    # df = df.ffill()
-    # df = df.bfill()
+    df = df.ffill()
+    df = df.bfill()
 
     return df
 
@@ -75,9 +75,13 @@ def toDFtest(pm25_filename, temp_filename, wind_filename):
     # wind_df.index = pd.DatetimeIndex(wind_df.index)
 
     pm25_df['copy_index'] = pm25_df.index
-    df = pd.merge(pm25_df, temp_df, left_index=True, right_index=True)
-    df = pd.merge(df, wind_df, left_index=True, right_index=True)
+    df = pd.merge(pm25_df, temp_df, left_index=True, right_index=True, how='left')
+    df = pd.merge(df, wind_df, left_index=True, right_index=True, how='left')
 
     df = df[['Temp','WindSpeed','WindDir','PM25']]
+
+    # padding first and last indices
+    df = df.ffill()
+    df = df.bfill()
 
     return df
