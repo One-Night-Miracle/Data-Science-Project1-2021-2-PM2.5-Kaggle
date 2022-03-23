@@ -21,7 +21,7 @@ def toDF(pm25_filename, temp_filename, wind_filename):
     temp_df.drop(columns={'Time'}, inplace=True)
     temp_df.columns = ['Temp']
     # pad() is similar to fillna() with forward filling
-    temp_df = temp_df.resample('h').pad()
+    temp_df = temp_df.resample('h').pad().ffill()
     temp_df = temp_df.bfill()
     # temp_df.index = pd.DatetimeIndex(temp_df.index)
 
@@ -53,6 +53,7 @@ def toDFtest(pm25_filename, temp_filename, wind_filename):
     pm25_df.set_index('Time', inplace=True)
     pm25_df.columns = ['PM25']
     pm25_df = pm25_df[~pm25_df.index.duplicated(keep='first')]
+    pm25_df.interpolate(inplace=True)
     pm25_df.index = pd.DatetimeIndex(pm25_df.index)
 
     temp_df = pd.read_csv('datasci_dataset_2022/'+temp_filename, names=['Time', 'Temp'], skiprows=1)
@@ -60,7 +61,8 @@ def toDFtest(pm25_filename, temp_filename, wind_filename):
     temp_df.set_index(temp_df['Time'], inplace=True)
     temp_df.drop(columns={'Time'}, inplace=True)
     temp_df.columns = ['Temp']
-    temp_df = temp_df.resample('h').bfill()
+    temp_df = temp_df.resample('h').ffill()
+    temp_df = temp_df.bfill()
 
     wind_df = pd.read_csv('datasci_dataset_2022/'+wind_filename, names=['Time', 'WindSpeed', 'WindDir'], skiprows=1)
     wind_df['Time'] = pd.to_datetime(wind_df['Time'])
@@ -68,7 +70,8 @@ def toDFtest(pm25_filename, temp_filename, wind_filename):
     wind_df.drop(columns={'Time'}, inplace=True)
     wind_df.columns = ['WindSpeed', 'WindDir']
     # backward filling
-    wind_df = wind_df.resample('h').bfill()
+    wind_df = wind_df.resample('h').ffill()
+    wind_df = wind_df.bfill()
     # wind_df.index = pd.DatetimeIndex(wind_df.index)
 
     pm25_df['copy_index'] = pm25_df.index
