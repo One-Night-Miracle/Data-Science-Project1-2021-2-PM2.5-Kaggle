@@ -41,20 +41,21 @@ class MinimalSARIMAX():
         X_train_Xt = np.array(X_train_exog[t-1])
         params_pX = np.array(self.params['pX'])
 
+        
         pX_pred = X_train_Xt @ params_pX
 
         return pX_pred, X_train_Xt
 
     def d_prediction(self, diff_X, t):
         if (self.d==0):
-            return [0],[0] 
-        start = max(t-self.p, 0)
-        diff_X_t = np.array(diff_X.iloc[t-1])
-        params_d = np.array(self.params['d'][:t-start])
+            return [0], [0]
+        start = max(t-self.d, 0)
+        diff_X_t = np.array(diff_X.iloc[start:t])[::-1]
+        params_d = np.array(self.params['d'][:t-start])[::-1]
 
         d_pred = diff_X_t @ params_d
 
-        return d_pred, diff_X_t
+        return d_pred, diff_X_t[::-1]
 
     def q_prediction(self, X_train, Error, t):
         start = max(t-self.q, 0)
@@ -128,7 +129,7 @@ class MinimalSARIMAX():
 
         self.params['Q'] += param_pad_0(x['Q'], self.Q) * error_t * lr
         
-        self.params['c'] += self.params['c'] * error_t * lr
+        self.params['c'] += 1 * error_t * lr
 
     #############################################################################
      
@@ -179,18 +180,18 @@ class MinimalSARIMAX():
    
     #############################################################################
     
-    def predict(self, y, y_X=None, verbose=0):
+    def predict(self, valid_X, valid_X_exog, y, y_exog=None, verbose=0):
         y_t = y.iloc[:,0].copy().to_numpy()
 
-        if y_X is not None:
-            y_Xt = y_X.copy().to_numpy()
+        if y_exog is not None:
+            y_exog_t = y_exog.copy().to_numpy()
 
-        diff_y_t = y.copy()
+        diff_X = y.copy()
         for i in range(1,self.d+1):
-            diff_y_t[f'diff{i}'] = diff_y_t.iloc[:,[0]].diff(periods=i)
+            diff_X[f'diff{i}'] = diff_X.iloc[:,[0]].diff(periods=i)
 
-        diff_y_t = diff_y_t.fillna(0)
-        diff_y_t = diff_y_t.iloc[:,1:]
+        diff_X = diff_X.fillna(0)
+        diff_X = diff_X.iloc[:,1:]
 
         Error = [y_t[0]-10]
 
@@ -199,8 +200,8 @@ class MinimalSARIMAX():
         for t in range(1,len(y_t)):
             pred = {} ; x = {}
             pred['p'], x['p'] = self.p_prediction(y_t, t)
-            pred['pX'], x['pX'] = self.pX_prediction(y_Xt, t) if y_X is not None else ([0], [0])
-            pred['d'], x['d'] = self.d_prediction(diff_y_t, t)
+            pred['pX'], x['pX'] = self.pX_prediction(y_exog_t, t) if y_exog is not None else ([0], [0])
+            pred['d'], x['d'] = self.d_prediction(diff_X, t)
             pred['q'], x['q'] = self.q_prediction(y_t, Error, t)
             
             pred['P'], x['P'] = self.P_prediction(y_t, t)
