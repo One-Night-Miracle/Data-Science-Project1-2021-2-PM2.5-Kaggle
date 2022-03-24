@@ -138,6 +138,9 @@ class MinimalSARIMAX():
     #############################################################################
      
     def fit(self, verbose=0, lr=1e-5, lr_decay=0.999):
+        disable=True
+        if verbose==1: disable=False
+
         X_train = self.X_train.iloc[:,0].copy().to_numpy()
 
         X_train_exog = None
@@ -147,8 +150,8 @@ class MinimalSARIMAX():
         diff_X = self.calcDiff(self.X_train)
 
         Error_X = [0]
-
-        for t in tqdm(range(1,X_train.shape[0])):
+        
+        for t in tqdm(range(1,X_train.shape[0]), disable=disable):
             lr *= lr_decay
 
             pred, x, error_X_t = self.predict_one(X_train, diff_X, t, Error_X, X_train_exog=X_train_exog)
@@ -524,10 +527,10 @@ class MinimalSARIMAX():
                 
                 # save to DF
                 if (save_time_y_sub <= end_time_y and
-                    t+s-val_Xt.shape[0] < y.shape[0]):
-                    sav_item = {'Time':save_time_y_sub,
-                                'Predict':pred_t['y'],
-                                'Actual':yt[t-val_Xt.shape[0]]}
+                        t+s-val_Xt.shape[0] < y.shape[0]):
+                    sav_item = {'Time': save_time_y_sub,
+                                'Predict': pred['y'],
+                                'Actual': yt[t+s-val_Xt.shape[0]]}
                     y_pred_sav = y_pred_sav.append(sav_item, ignore_index=True, sort=False)
                     save_time_y_sub += pd.Timedelta(hours=6)
 
