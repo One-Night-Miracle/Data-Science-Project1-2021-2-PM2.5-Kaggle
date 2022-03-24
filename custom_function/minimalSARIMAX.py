@@ -185,8 +185,13 @@ class MinimalSARIMAX():
         x = {}
 
         pred['p'], x['p'] = model_out.p_prediction(X_train, t)
-        pred['pX'], x['pX'] = model_out.pX_prediction(
-            X_train_exog, t) if X_train_exog is not None else ([0], [0])
+
+        if (X_train_exog is None or X_train_exog==[]):
+            pred['pX'], x['pX'] = ([0], [0])
+        else:
+            pred['pX'], x['pX'] = model_out.pX_prediction(X_train_exog, t) 
+            
+
         pred['d'], x['d'] = model_out.d_prediction(diff_X, t)
         pred['q'], x['q'] = model_out.q_prediction(
             Error_X, t) if Error_X is not None else ([0], [0])
@@ -223,8 +228,7 @@ class MinimalSARIMAX():
             x = {}
 
             pred['p'], x['p'] = self.p_prediction(y_t, t)
-            pred['pX'], x['pX'] = self.pX_prediction(
-                y_exog_t, t) if y_exog is not None else ([0], [0])
+            pred['pX'], x['pX'] = self.pX_prediction(y_exog_t, t) if y_exog is not None else ([0], [0])
             pred['d'], x['d'] = self.d_prediction(diff_y, t)
             pred['q'], x['q'] = self.q_prediction(Error, t)
 
