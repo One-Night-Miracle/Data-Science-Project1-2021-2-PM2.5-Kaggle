@@ -240,7 +240,6 @@ class MinimalSARIMAX():
                 print(t, pred['y'], y_t[t], error_t)
 
             Error.append(error_t)
-
         y_pred_tmp = y.iloc[:, [0]].copy()
         col_name = y_pred_tmp.columns.values[0]
         y_pred_tmp.rename({col_name: '0'}, axis='columns')
