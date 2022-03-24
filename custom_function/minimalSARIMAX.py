@@ -144,6 +144,8 @@ class MinimalSARIMAX():
     #############################################################################
 
     def fit(self, verbose=0, lr=1e-5, lr_decay=0.999):
+        tqdm_disable = False
+        if (verbose==0): tqdm_disable=True
         X_train = self.X_train.iloc[:, 0].copy().to_numpy()
 
         X_train_exog = None
@@ -154,7 +156,7 @@ class MinimalSARIMAX():
 
         Error_X = [0]
 
-        for t in tqdm(range(1, X_train.shape[0])):
+        for t in tqdm(range(1, X_train.shape[0]), disable=tqdm_disable):
             lr *= lr_decay
 
             pred, x, error_X_t = self.predict_one(
@@ -240,15 +242,17 @@ class MinimalSARIMAX():
                 print(t, pred['y'], y_t[t], error_t)
 
             Error.append(error_t)
-        y_pred_tmp = y.iloc[:, [0]].copy()
-        col_name = y_pred_tmp.columns.values[0]
-        y_pred_tmp.rename({col_name: '0'}, axis='columns')
-        y_pred_tmp = y_pred_tmp.append({col_name: y_pred}, ignore_index=True)
+
+        col_name = y.columns.values[0]
+        df = pd.DataFrame({col_name:y_pred[-y.shape[0]:]},index=y.index)
+    
+        # display(df)
+        # print('finised!')
 
         if e_flag:
             return Error
 
-        return y_pred_tmp[[col_name]], Error
+        return df, Error
 
     def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, model_pd=None, step=12, learn=False, lr=5e-6, lr_decay=0.999):
         exog_flag = False
@@ -584,8 +588,7 @@ class MinimalSARIMAX():
     #############################################################################
 
     def RMSE(self, y_test, y_pred):
-        mse = mean_squared_error(y_test, y_pred)
-        rmse = np.sqrt(mse)
+        rmse = self.scoring(y_test, y_pred)
         print(f'Test on SARIMAX with RMSE: {rmse}')
 
     def scoring(self, y_test, y_pred):
