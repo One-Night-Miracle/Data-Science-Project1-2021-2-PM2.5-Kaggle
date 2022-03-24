@@ -146,6 +146,7 @@ class MinimalSARIMAX():
     def fit(self, verbose=0, lr=1e-5, lr_decay=0.999):
         tqdm_disable = False
         if (verbose==0): tqdm_disable=True
+
         X_train = self.X_train.iloc[:, 0].copy().to_numpy()
 
         X_train_exog = None
@@ -300,8 +301,6 @@ class MinimalSARIMAX():
             sav_item, ignore_index=True, sort=False)
         save_time_v += pd.Timedelta(hours=6)
 
-        # print(val_X_exogt.shape)
-
         for t in range(1, len(val_Xt)):
             # limit viewing
             cur_Xt = val_Xt[:t]
@@ -445,12 +444,12 @@ class MinimalSARIMAX():
             diff_y_exogt = np.array(diff_y_exogt)
 
         # save to DF
-        sav_item = {'Time': save_time_v,
-                    'Predict': pred_init,
-                    'Actual': val_Xt[0]}
-        val_pred_sav = val_pred_sav.append(
-            sav_item, ignore_index=True, sort=False)
-        save_time_v += pd.Timedelta(hours=6)
+        # sav_item = {'Time': save_time_v,
+        #             'Predict': pred_init,
+        #             'Actual': val_Xt[0]}
+        # val_pred_sav = val_pred_sav.append(
+        #     sav_item, ignore_index=True, sort=False)
+        # save_time_v += pd.Timedelta(hours=6)
 
         for t in range(val_Xt.shape[0], val_Xt.shape[0] + y.shape[0]):
             # limit viewing
@@ -571,8 +570,8 @@ class MinimalSARIMAX():
                 if (save_time_y_sub <= end_time_y and
                         t+s-val_Xt.shape[0] < y.shape[0]):
                     sav_item = {'Time': save_time_y_sub,
-                                'Predict': pred_t['y'],
-                                'Actual': yt[t-val_Xt.shape[0]]}
+                                'Predict': pred['y'],
+                                'Actual': yt[t+s-val_Xt.shape[0]]}
                     y_pred_sav = y_pred_sav.append(
                         sav_item, ignore_index=True, sort=False)
                     save_time_y_sub += pd.Timedelta(hours=6)
