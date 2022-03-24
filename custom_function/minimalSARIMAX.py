@@ -31,9 +31,9 @@ class MinimalSARIMAX():
     
     def p_prediction(self, X_train, t):
         start = max(t-self.p, 0)
-        X_train_t = np.array(X_train[start:t])[::-1].ravel()
+        X_train_t = np.array(X_train[start:t])[::-1].reshape((-1))
+        
         params_p = np.array(self.params['p'][:t-start])[::-1]
-
         p_pred = X_train_t @ params_p[:X_train_t.shape[0]]
 
         return p_pred, X_train_t[::-1]
@@ -41,10 +41,10 @@ class MinimalSARIMAX():
     def pX_prediction(self, X_train_exog, t):
         if (t<=0):
             return [0], [0]
-        X_train_exog_t = np.array(X_train_exog[t-1]).ravel()
+        X_train_exog_t = np.array(X_train_exog[t-1]).reshape((-1))
         params_pX = np.array(self.params['pX'])
         
-        pX_pred = X_train_exog_t @ params_pX[:X_train_exog_t.shape[0]]
+        pX_pred = X_train_exog_t @ params_pX
 
         return pX_pred, X_train_exog_t
 
@@ -52,7 +52,7 @@ class MinimalSARIMAX():
         if (self.d==0):
             return [0], [0]
         start = max(t-self.d, 0)
-        diff_X_t = np.array(diff_X[start:t])[::-1].ravel()
+        diff_X_t = np.array(diff_X[start:t])[::-1].reshape((-1))
         params_d = np.array(self.params['d'][:t-start])[::-1]
 
         d_pred = diff_X_t @ params_d[:diff_X_t.shape[0]]
@@ -61,10 +61,10 @@ class MinimalSARIMAX():
 
     def q_prediction(self, Error, t):
         start = max(t-self.q, 0)
-        error_t = np.array(Error[start:t])[::-1].ravel()
+        error_t = np.array(Error[start:t])[::-1].reshape((-1))
         params_q = np.array(self.params['q'][:t-start])[::-1]
 
-        q_pred = error_t @ params_q[:error_t.shape[0]]
+        q_pred = error_t @ params_q
 
         return q_pred, error_t[::-1]
     
@@ -75,7 +75,7 @@ class MinimalSARIMAX():
         if (ss_c==0 or self.params['P']==[0]):
             return [0], [0]
         ss_c = min(ss_c, self.P)
-        X_train_ts = np.array(X_train[t-self.S::-self.S])[:ss_c].ravel()
+        X_train_ts = np.array(X_train[t-self.S::-self.S])[:ss_c].reshape((-1))
         params_P = np.array(self.params['P'][::-1])[:ss_c]
         
         P_pred = X_train_ts @ params_P[:X_train_ts.shape[0]]
@@ -87,7 +87,7 @@ class MinimalSARIMAX():
         if (ss_c==0 or self.params['D']==[0]):
             return [0], [0]
         ss_c = min(ss_c, self.P)
-        diff_X_ts = np.array(X_train[t-1-self.S::-self.S])[:1].ravel()
+        diff_X_ts = np.array(X_train[t-1-self.S::-self.S])[:1].reshape((-1))
         params_D = np.array(self.params['D'])
         
         D_pred = diff_X_ts @ params_D[:diff_X_ts.shape[0]]
@@ -237,7 +237,7 @@ class MinimalSARIMAX():
         
         return y_pred_tmp[[col_name]], Error
     
-    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, model_pd=None, step=12, learn=False, lr=5e-5, lr_decay=0.9999):
+    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, model_pd=None, step=12, learn=False, lr=5e-6, lr_decay=0.999):
         exog_flag = False
         if val_X_exog is not None:
             exog_flag = True
@@ -272,7 +272,7 @@ class MinimalSARIMAX():
             val_X_exogt = val_X_exog.copy().to_numpy()
             for i in range(3):
                 diff_X_exogt.append(self.calcDiff(val_X_exog.iloc[:,[i]]))
-                Error_X_exogt.append([val_X_exogt[i][0] - pred_init_exog[i]])
+                Error_X_exogt.append([val_X_exogt[0][i] - pred_init_exog[i]])
             diff_X_exogt = np.array(diff_X_exogt)
             
 
@@ -282,6 +282,8 @@ class MinimalSARIMAX():
                     'Actual':val_Xt[0]}
         val_pred_sav = val_pred_sav.append(sav_item, ignore_index=True, sort=False)
         save_time_v += pd.Timedelta(hours=6)
+
+        # print(val_X_exogt.shape)
 
         for t in range(1,len(val_Xt)):
             # limit viewing
@@ -294,19 +296,20 @@ class MinimalSARIMAX():
             pred_exog = [0]*3 ; x_update_exog = [0]*3 ; error_X_exog = [0]*3
             if exog_flag:
                 for i in range(3):
-                    cur_X_exogt.append(val_X_exogt[i][:t])
+                    cur_X_exogt.append(val_X_exogt[:t,i])
                     cur_diff_X_exogt.append(diff_X_exogt[i,:t])
-
-                    # print(i,model_exo[i].params)
-                    pred_exog[i], x_update_exog[i], error_X_exog[i] = self.predict_one(cur_X_exogt[i], cur_diff_X_exogt[i], t, Error_X_exogt[i], model_out=model_exo[i])
                     
-                
+                    # print(i,t,cur_X_exogt[i])
+                    pred_exog[i], x_update_exog[i], error_X_exog[i] = self.predict_one(cur_X_exogt[:][i], cur_diff_X_exogt[i], t, Error_X_exogt[i], model_out=model_exo[i])
+                    
                     ## learning
                     if learn:
                         model_exo[i].update_params(x_update_exog[i], error_X_exog[i], lr)
                     
                     ## append Error
                     Error_X_exogt[i].append(error_X_exog[i])
+                cur_X_exogt = np.array(cur_X_exogt).reshape((-1,3))
+
 
 
             # then do main thing
@@ -339,11 +342,7 @@ class MinimalSARIMAX():
             if exog_flag:
                 for i in range(3):
                     cur_pred_X_exogt.append([pred_exog[i]['y']])
-                    cur_pred_diff_X_exogt.append([pred_exog[i]['y'] - cur_X_exogt[i][-1]])
-
-            # print(cur_pred_X_exogt)
-            # print(cur_pred_diff_X_exogt)
-            # print()
+                    cur_pred_diff_X_exogt.append([pred_exog[i]['y'] - cur_X_exogt[-1][i]])
 
             for s in range(1,step):
                 if learn:
@@ -352,40 +351,31 @@ class MinimalSARIMAX():
                 cur_X_s = list(cur_Xt) + cur_pred
 
                 # append diff
-                
                 diff_Xt_s = list(cur_diff_Xt) + diff_cur_pred
                 diff_Xt_s.append(cur_X_s[-1] - cur_X_s[-2])
 
                 # do exog first
-                cur_X_exog_s = None
+                cur_X_exog_s = [[]]*3
                 cur_diff_X_exog_s = [[]]*3
                 pred_exog = [0]*3 ; x_update_exog = [0]*3 ; error_X_exog = [0]*3
                 if exog_flag:
                     for i in range(3):
-                        print(1,cur_pred_X_exogt[i])
-                        print(type(cur_X_exogt), type(cur_pred_X_exogt))
-                        
-                        
-                        cur_X_exog_s[i] = list(cur_X_exogt[i]) + list(cur_pred_X_exogt[i])
+                        cur_X_exog_s[i] = list(cur_X_exogt[:,i]) + list(cur_pred_X_exogt[i])
+
                         # append diff
-                        print(2,cur_X_exog_s[i])
-                        print(3,cur_pred_diff_X_exogt[i])
-                        
                         cur_diff_X_exog_s[i] = list(cur_diff_X_exogt[i]) + cur_pred_diff_X_exogt[i]
-                        
-                        print(4,cur_diff_X_exog_s[i])
                         cur_diff_X_exog_s[i].append(cur_X_exog_s[i][-1] - cur_X_exog_s[i][-2])
 
-                        
                         pred_exog[i], x_update_exog[i], error_X_exog[i] = self.predict_one(cur_X_exog_s[i], cur_diff_X_exog_s[i], t, model_out=model_exo[i])
+
+                        cur_pred_X_exogt[i].append(pred_exog[i]['y'])
                     
                         ## learning
                         if learn:
                             model_exo[i].update_params(x_update_exog[i], error_X_exog[i], lr)
-    
 
                 # then do main thing
-                pred, x_update, error_X = self.predict_one(cur_X_s, diff_Xt_s, t+s, X_train_exog=cur_X_exog_s, model_out=model_pd)
+                pred, x_update, error_X = self.predict_one(cur_X_s, diff_Xt_s, t+s, X_train_exog=np.moveaxis(cur_X_exog_s,-1,0), model_out=model_pd)
 
                 ## learning 11 steps
                 if learn:
@@ -416,12 +406,13 @@ class MinimalSARIMAX():
         ## initialize y_exog variables
         y_exogt = None
         diff_y_exogt = []
-        Error_y_exogt = None
+        Error_y_exogt = [[]]*3
         if exog_flag:
             y_exogt = y_exog.copy().to_numpy()
-            for key, _ in y_exog:
-                diff_y_exogt.append(self.calcDiff(y_exog[key]))
-            Error_y_exogt = Error_X_exogt + [y_exogt[:,0] - list(val_X_exogt[:,-1])]
+            for i in range(3):
+                diff_y_exogt.append(self.calcDiff(y_exog.iloc[:,[i]]))
+                Error_y_exogt[i] = Error_X_exogt[i] + [y_exogt[0][i] - val_X_exogt[0][i]]
+            diff_y_exogt = np.array(diff_y_exogt)
 
         ## save to DF
         sav_item = {'Time':save_time_v,
@@ -442,8 +433,9 @@ class MinimalSARIMAX():
             pred_exog = [0]*3 ; y_update_exog = [0]*3 ; error_y_exog = [0]*3
             if exog_flag:
                 for i in range(3):
-                    cur_y_exogt.append(y_exogt[i][:t])
-                    cur_diff_y_exogt.append(diff_y_exogt[i][:t])
+                    cur_y_exogt.append(list(val_Xt) + list(y_exogt[:t-val_Xt.shape[0],i]))
+                    cur_diff_y_exogt.append(list(diff_Xt) + list(diff_y_exogt[i,:t-val_Xt.shape[0]]))
+                    # print(t,i,(cur_y_exogt[i]).shape)
                     pred_exog[i], y_update_exog[i], error_y_exog[i] = self.predict_one(cur_y_exogt[i], cur_diff_y_exogt[i], t, Error_y_exogt[i], model_out=model_exo[i])
                 
                     ## learning
@@ -452,10 +444,10 @@ class MinimalSARIMAX():
                     
                     ## append Error
                     Error_y_exogt[i].append(error_y_exog[i])
-
+                cur_y_exogt = np.array(cur_y_exogt).reshape((-1,3))
 
             # then do main thing
-            pred_t, y_update, error_y = self.predict_one(cur_yt, cur_diff_yt, t, Error_y, model_out=model_pd)
+            pred_t, y_update, error_y = self.predict_one(cur_yt, cur_diff_yt, t, Error_y, X_train_exog=cur_y_exogt, model_out=model_pd)
 
             # learning
             if learn:
@@ -484,7 +476,7 @@ class MinimalSARIMAX():
             if exog_flag:
                 for i in range(3):
                     cur_pred_y_exogt.append([pred_exog[i]['y']])
-                    cur_pred_diff_y_exogt.append([pred_exog[i]['y'] - cur_y_exogt[i][-1]])
+                    cur_pred_diff_y_exogt.append([pred_exog[i]['y'] - cur_y_exogt[-1][i]])
 
             for s in range(1,step):
                 if learn:
@@ -496,18 +488,22 @@ class MinimalSARIMAX():
                 diff_yt_s = list(diff_yt) + diff_cur_pred
                 diff_yt_s.append(cur_yt_s[-1]-cur_yt_s[-2])
 
+
                 # do exog first
-                cur_y_exog_s = None
-                cur_diff_y_exog_s = []
+                cur_y_exog_s = [[]]*3
+                cur_diff_y_exog_s = [[]]*3
                 pred_exog = [0]*3 ; y_update_exog = [0]*3 ; error_y_exog = [0]*3
                 if exog_flag:
-                    cur_y_exog_s = np.array(list(cur_y_exogt) + list(cur_pred_y_exogt))
                     for i in range(3):
+                        cur_y_exog_s[i] = list(cur_y_exogt[:,i]) + list(cur_pred_y_exogt[i])
+
                         # append diff
-                        cur_diff_y_exog_s[i] = list(cur_diff_y_exogt[i]) + list(cur_pred_diff_y_exogt[i])
+                        cur_diff_y_exog_s[i] = list(cur_diff_y_exogt[i]) + cur_pred_diff_y_exogt[i]
                         cur_diff_y_exog_s[i].append(cur_y_exog_s[i][-1] - cur_y_exog_s[i][-2])
                         
                         pred_exog[i], y_update_exog[i], error_y_exog[i] = self.predict_one(cur_y_exog_s[i], cur_diff_y_exog_s[i], t, model_out=model_exo[i])
+
+                        cur_pred_y_exogt[i].append(pred_exog[i]['y'])
                     
                         ## learning
                         if learn:
@@ -515,7 +511,7 @@ class MinimalSARIMAX():
     
 
                 # then do main thing
-                pred, y_update, error_y = self.predict_one(cur_yt_s, diff_yt_s, t+s, model_out=model_pd)
+                pred, y_update, error_y = self.predict_one(cur_yt_s, diff_yt_s, t+s, X_train_exog=np.moveaxis(cur_y_exog_s,-1,0), model_out=model_pd)
 
                 # learning 11 steps
                 if learn:
