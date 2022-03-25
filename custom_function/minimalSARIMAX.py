@@ -186,9 +186,10 @@ class MinimalSARIMAX():
 
         pred['p'], x['p'] = model_out.p_prediction(X_train, t)
 
-        if (X_train_exog is None or X_train_exog==[]):
+        if (X_train_exog is None or not X_train_exog.all()):
             pred['pX'], x['pX'] = ([0], [0])
         else:
+            # print(X_train_exog)
             pred['pX'], x['pX'] = model_out.pX_prediction(X_train_exog, t) 
             
 
