@@ -1,4 +1,3 @@
-from queue import Empty
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -26,11 +25,6 @@ class MinimalSARIMAX():
         self.params['Q'] = [random.uniform(0, 0.1)]*self.Q if self.Q else np.zeros(1)
         self.params['c'] = random.uniform(0, 0.1)
 
-        self.params['P'] = [random.uniform(0,0.1)]*self.P if self.P else np.zeros(1)
-        self.params['D'] = [random.uniform(0,0.1)]*self.D if self.D else np.zeros(1)
-        self.params['Q'] = [random.uniform(0,0.1)]*self.Q if self.Q else np.zeros(1)
-        self.params['c'] = random.uniform(0,0.1)
-
         self.Error_X = None
     
     #############################################################################
@@ -55,8 +49,7 @@ class MinimalSARIMAX():
         return pX_pred, X_train_exog_t
 
     def d_prediction(self, diff_X, t):
-        if (self.d == 0 or t <= 0):
-            return np.zeros(1), np.zeros(1)
+        if (self.d == 0 or t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.d, 0)
         diff_X_t = np.array(diff_X[start:t])[::-1]
         params_d = np.array(self.params['d'][:t-start])[::-1]
@@ -66,14 +59,11 @@ class MinimalSARIMAX():
         return d_pred, diff_X_t[::-1]
 
     def q_prediction(self, Error, t):
-        if (self.q == 0 or t <= 0):
-            return np.zeros(1), np.zeros(1)
+        if (self.q == 0 or t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.q, 0)
-
-        error_t = np.array(Error[start:t])[::-1]
+        error_t = np.array(Error[start:t]).ravel()[::-1]
         params_q = np.array(self.params['q'][:t-start])[::-1]
 
-        # print(error_t, params_q)
         q_pred = error_t @ params_q
 
         return q_pred, error_t[::-1]
@@ -121,12 +111,14 @@ class MinimalSARIMAX():
     def update_params(self, x, error_t, lr):
 
         def param_pad_0(x, size):
-            if (size==0): return np.zeros(1)
-            x = np.array([x]).ravel()
+            if (size==0 or len(x)==0):
+                return np.zeros(1)
+            x = np.array(x).ravel()
             result = np.zeros(size)
             result[:x.shape[0]] = x
             return result
-        
+
+
         if 'p' in x:       
             self.params['p'] += param_pad_0(x['p'], self.p) * error_t * lr
 
@@ -197,19 +189,27 @@ class MinimalSARIMAX():
 
         pred['p'], x['p'] = self.p_prediction(X_train, t-1)
 
-        if (X_train_exog is None or X_train_exog is Empty):
-            pred['pX'], x['pX'] = (np.zeros(1), np.zeros(1))
-        else:
-            # print(X_train_exog)
+        if (X_train_exog is not None and len(X_train_exog)):
             pred['pX'], x['pX'] = self.pX_prediction(X_train_exog, t-1) 
-            
+        else:
+            pred['pX'], x['pX'] = (np.zeros(1), np.zeros(1))
+         
 
         pred['d'], x['d'] = self.d_prediction(diff_X, t-1)
-        pred['q'], x['q'] = self.q_prediction(Error_X, t-1) if Error_X is not None else (np.zeros(1), np.zeros(1))
-
+        
+        if (Error_X is None or len(Error_X)<2):
+            pred['q'], x['q'] = (np.zeros(1), np.zeros(1))
+        else:
+            # print(t, len(Error_X), np.array(Error_X))
+            pred['q'], x['q'] = self.q_prediction(np.array(Error_X), t-1)
+            
         pred['P'], x['P'] = self.P_prediction(X_train, t-1)
         pred['D'], x['D'] = self.D_prediction(X_train, t-1)
-        pred['Q'], x['Q'] = self.Q_prediction(Error_X, t-1) if Error_X is not None else (np.zeros(1), np.zeros(1))
+
+        if (Error_X is not None and ('Q' in x) and len(x['Q'])):
+            pred['Q'], x['Q'] = self.Q_prediction(np.array(Error_X), t-1)
+        else:
+            pred['Q'], x['Q'] =(np.zeros(1), np.zeros(1))
 
         pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] + pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
 
@@ -262,18 +262,14 @@ class MinimalSARIMAX():
 
         return df, Error
 
-    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, model_pd=None, step=12, learn=False, lr=np.array([1e-7]), lr_decay=0.999):
+    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, learn=False, lr=np.array([1e-7]), lr_decay=0.999):
+
         exog_flag = False
         if val_X_exog is not None:
             exog_flag = True
             model_exo = []
             for key in model_exog:
                 model_exo.append(model_exog[key])
-        
-        if model_pd is None:
-            model_pd = self
-        
-        dream_scaler = 0.25
         
 
         save_time = val_X.index[0]
@@ -349,6 +345,8 @@ class MinimalSARIMAX():
                     # input 't' to predict 't-1'
                     pred_exog[i], x_update_exog[i] = model_exo[i].predict_one(cur_X_exogt[i], cur_diff_X_exogt[i], t+1, Error_X_exogt[i])
 
+                    error_X_exog[i] = 0
+
                     if (t >= step+1):
                         li_x_update_exo_tmp = twelve_x[i][twelve_x[i]['Time']==(save_time-pd.Timedelta(hours=6))].copy()
                         
@@ -357,20 +355,20 @@ class MinimalSARIMAX():
                         # del 'this time' rows
                         twelve_x[i] = twelve_x[i][twelve_x[i]['Time']!=(save_time-pd.Timedelta(hours=6))]
 
-                        # display(li_x_update_exo_tmp)
-
                         for key in li_x_update_exo_tmp:
                             if (key=='Time'): continue
                             li_x_update_exo[key] = np.array(li_x_update_exo_tmp[key]).mean()
                         
                         error_X_exog[i] = cur_X_exogt[i][-2] - li_x_update_exo['y']
-                        # append Error
-                        Error_X_exogt[i].append(error_X_exog[i])
+                        
 
                         # learning
                         if learn:
                             li_x_update_exo['pX'] = 0
                             model_exo[i].update_params(li_x_update_exo, error_X_exog[i], lr[i+1])
+                    
+                    # append Error
+                    Error_X_exogt[i].append(error_X_exog[i])
                         
 
                     x_update_exog[i]['Time'] = save_time
@@ -384,6 +382,8 @@ class MinimalSARIMAX():
             # then do main thing
             # input 't' to predict 't-1'
             pred, x_update = self.predict_one(cur_Xt, cur_diff_Xt, t+1, Error_X, X_train_exog=cur_X_exogt)
+
+            error_X = 0
             
             if (t >= step+1):
                 li_x_update_tmp = twelve[twelve['Time']==save_time-pd.Timedelta(hours=6)]
@@ -398,14 +398,14 @@ class MinimalSARIMAX():
                     li_x_update[key] = np.array(li_x_update_tmp[key]).mean(axis=0)
 
                 error_X = cur_Xt[-2] - li_x_update['y']
-                # append Error
-                Error_X.append(error_X)
-                Error_sav.append(error_X)
                 
                 # learning
                 if learn:
-                    # print(li_x_update['Time'],li_x_update['y'],li_x_update['p'],lr[0])
                     self.update_params(li_x_update, error_X, lr[0])
+                
+            # append Error
+            Error_X.append(error_X)
+            Error_sav.append(error_X)
             
             x_update['Time'] = save_time
             x_update['y'] = pred
@@ -443,7 +443,6 @@ class MinimalSARIMAX():
                 
                 cur_X_s = list(cur_Xt) + cur_pred
                 
-
                 # append diff
                 diff_Xt_s = list(cur_diff_Xt) + diff_cur_pred
                 diff_Xt_s.append(cur_X_s[-1] - cur_X_s[-2])
@@ -469,7 +468,6 @@ class MinimalSARIMAX():
                         x_update_exog[i]['Time'] = save_time_sub
                         x_update_exog[i]['y'] = pred_exog[i]
                         twelve_x[i] = twelve_x[i].append(x_update_exog[i], ignore_index=True)
-
 
 
                 # then do main thing
