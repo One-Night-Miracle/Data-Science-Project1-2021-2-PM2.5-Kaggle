@@ -267,7 +267,9 @@ class MinimalSARIMAX():
     
     #############################################################################
 
-    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, lr=np.array([1e-7]), lr_decay=0.95):
+    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, lr=np.array([1e-7]), lr_decay=0.95, lr_decay_iter=1, verbose=0, verbose_rmse=1):
+
+        lr_copy = lr.copy()
 
         exog_flag = False
         if val_X_exog is not None:
@@ -278,7 +280,8 @@ class MinimalSARIMAX():
         
 #         for iter in tqdm(range(n_iter)):
         for iter in range(n_iter):
-            if iter>0: lr *= lr_decay
+            if iter>0:
+                lr *= lr_copy*lr_decay_iter
 
             save_time = val_X.index[0]
             start_time_y = y.index[0]
@@ -359,9 +362,15 @@ class MinimalSARIMAX():
             save_time += pd.Timedelta(hours=6)
 
 
-            for t in tqdm(range(1, len(val_Xt))):
+            for t in tqdm(range(1, len(val_Xt)), disable=(verbose==0)):
 #             for t in range(1, len(val_Xt)):
-#                 if learn: lr *= lr_decay
+                if learn:
+                    lr *= lr_decay
+                    lr = np.maximum(lr, 0.1*lr_copy)
+
+                # if t%100==0:
+                #     rmse = ((np.array(Error_sav)**2).mean())**(1/2)
+                #     print(rmse)
 
                 # limit viewing
                 cur_Xt = val_Xt[:t]
@@ -528,6 +537,12 @@ class MinimalSARIMAX():
                     save_time_sub += pd.Timedelta(hours=6)
                     
                     cur_pred.append(pred)
+
+            if verbose_rmse:
+                rmse = ((np.array(Error_sav)**2).mean())**(1/2)
+                print(f"ITER#{iter}  RMSE:{rmse}")
+            
+            
         
 
         return  (pred_sav, y_pred_sav, np.array(Error_sav))
