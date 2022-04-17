@@ -185,15 +185,12 @@ class MinimalSARIMAX():
     
     def predict_one(self, X_train, diff_X, t, Error_X=None, X_train_exog=None):
 
-        def LeakyReLU(x, alpha=1):
-            return np.maximum(alpha*x, x)
-
         pred = {} ; x = {}
 
         pred['p'], x['p'] = self.p_prediction(X_train, t-1)
 
         # if (X_train_exog is not None and len(X_train_exog)):
-        if (X_train_exog is not None and X_train_exog!=[[]]*3 and len(X_train_exog)):
+        if (X_train_exog is not None and X_train_exog!=[[]]*4 and len(X_train_exog)):
             pred['pX'], x['pX'] = self.pX_prediction(X_train_exog, t-1) 
         else:
             pred['pX'], x['pX'] = (np.zeros(1), np.zeros(1))
@@ -214,7 +211,6 @@ class MinimalSARIMAX():
             pred['Q'], x['Q'] = (np.zeros(1), np.zeros(1))
 
         pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] + pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
-        pred['y'] = LeakyReLU(pred['y'])
 
         return pred['y'], x
 
@@ -268,6 +264,8 @@ class MinimalSARIMAX():
     #############################################################################
 
     def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, lr=np.array([1e-7]), lr_decay=0.95, lr_decay_iter=1, verbose=0, verbose_rmse=1):
+        def ReLU(x):
+            return np.maximum(0, x)
 
         lr_copy = lr.copy()
 
@@ -295,7 +293,7 @@ class MinimalSARIMAX():
             
             ## random init
             pred_init = random.randint(5,10)
-            pred_init_exog = np.array([30, 25, 90])
+            pred_init_exog = np.array([30, 25, 5, 5])
 
             # initialize variables
             val_Xt = pd.concat([val_X.iloc[:,0].copy(),y.iloc[:,0].copy()]).to_numpy()
@@ -308,7 +306,7 @@ class MinimalSARIMAX():
 
             x_update_T = {'Time':save_time,
                           'p':np.array([0.01]),
-                          'pX':np.array([0.01])*3,
+                          'pX':np.array([0.01])*4,
                           'd':np.array([0.01]),
                           'q':np.array([0.01]),
                           'P':np.array([0.01]),
@@ -325,9 +323,9 @@ class MinimalSARIMAX():
             if exog_flag:
                 val_X_exogt = pd.concat([val_X_exog.copy(),y_exog.copy()]).to_numpy()
                 twelve_x = None
-                twelve_x = [pd.DataFrame(columns=['Time','p','pX','d','q','P','D','Q','y'])]*3
+                twelve_x = [pd.DataFrame(columns=['Time','p','pX','d','q','P','D','Q','y'])]*4
                 
-                for i in range(3):
+                for i in range(4):
                     x_update_exog_T = {'Time':save_time,
                                        'p':np.array([0.01]),
                                        'pX':[],
@@ -377,14 +375,14 @@ class MinimalSARIMAX():
                 cur_diff_Xt = diff_Xt[:t]
 
                 # do exog first
-                cur_X_exogt = [[]]*3
+                cur_X_exogt = [[]]*4
                 cur_diff_X_exogt = []
                 
-                error_X_exog = [0]*3
+                error_X_exog = [0]*4
                 if exog_flag:
-                    pred_exog = [0]*3
-                    x_update_exog = [x_update_exog_T]*3
-                    for i in range(3):
+                    pred_exog = [0]*4
+                    x_update_exog = [x_update_exog_T]*4
+                    for i in range(4):
                         cur_X_exogt[i] = list(val_X_exogt[:, i])
 
                         cur_diff_X_exogt.append(diff_X_exogt[i, :t])
@@ -422,12 +420,13 @@ class MinimalSARIMAX():
                         x_update_exog[i]['y'] = pred_exog[i]
                         twelve_x[i] = twelve_x[i].append(x_update_exog[i], ignore_index=True)
                     
-                    cur_X_exogt = np.array(cur_X_exogt).reshape((-1, 3))
+                    cur_X_exogt = np.array(cur_X_exogt).reshape((-1, 4))
                 
 
 
                 # then do main thing
                 # input 't' to predict 't-1'
+                # print(cur_X_exogt.shape)
                 pred, x_update = self.predict_one(cur_Xt, cur_diff_Xt, t+1, Error_X, X_train_exog=cur_X_exogt)
 
                 error_X = 0
@@ -460,7 +459,7 @@ class MinimalSARIMAX():
             
                 # save to DF
                 sav_item = {'Time': save_time,
-                            'Predict': pred,
+                            'Predict': ReLU(pred),
                             'Actual': val_Xt[t]}
                 if (save_time < start_time_y):
                     pred_sav = pred_sav.append(sav_item, ignore_index=True, sort=False)
@@ -479,7 +478,7 @@ class MinimalSARIMAX():
                 cur_pred_X_exogt = []
                 cur_pred_diff_X_exogt = []
                 if exog_flag:
-                    for i in range(3):
+                    for i in range(4):
                         cur_pred_X_exogt.append([pred_exog[i]])
                         cur_pred_diff_X_exogt.append([pred_exog[i] - cur_X_exogt[-1][i]])
 
@@ -493,12 +492,12 @@ class MinimalSARIMAX():
                     diff_Xt_s.append(cur_X_s[-1] - cur_X_s[-2])
 
                     # do exog first
-                    cur_X_exog_s = [[]]*3
-                    cur_diff_X_exog_s = [[]]*3
+                    cur_X_exog_s = [[]]*4
+                    cur_diff_X_exog_s = [[]]*4
                     
                     if exog_flag:
-                        pred_exog = [0]*3 ; x_update_exog = [x_update_exog_T]*3 ; error_X_exog = [0]*3
-                        for i in range(3):
+                        pred_exog = [0]*4 ; x_update_exog = [x_update_exog_T]*4 ; error_X_exog = [0]*4
+                        for i in range(4):
                             cur_X_exog_s[i] = list(cur_X_exogt[:, i]) + list(cur_pred_X_exogt[i])
 
                             # append diff
@@ -527,7 +526,7 @@ class MinimalSARIMAX():
                     # save to DF
                     if (t+s<val_Xt.shape[0]):
                         sav_item = {'Time': save_time_sub,
-                                    'Predict': pred,
+                                    'Predict': ReLU(pred),
                                     'Actual': val_Xt[t+s]}
                         if (save_time_sub < start_time_y):
                             pred_sav = pred_sav.append(sav_item, ignore_index=True, sort=False)
