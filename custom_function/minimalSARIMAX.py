@@ -263,7 +263,7 @@ class MinimalSARIMAX():
     
     #############################################################################
 
-    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, lr=np.array([1e-7]), lr_decay=0.95, lr_decay_iter=1, verbose=0, verbose_rmse=1):
+    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, learn_exog=False, lr=np.array([1e-7]), lr_decay=0.95, lr_decay_iter=1, verbose=0, verbose_rmse=1):
         def ReLU(x):
             return np.maximum(0, x)
 
@@ -337,18 +337,7 @@ class MinimalSARIMAX():
                                        'y':np.array(pred_init_exog[i])}
                     diff_X_exogt.append(self.calcDiff(val_X_exog.iloc[:,[i]]))
                     Error_X_exogt.append([val_X_exogt[0] - pred_init_exog[i]])
-                    if i==2:
-                        dir_update_exog_T = {'Time':save_time,
-                                             'p':np.array([0.001]),
-                                             'pX':[],
-                                             'd':np.array([0.001]),
-                                             'q':np.array([0.001]),
-                                             'P':np.array([0.001]),
-                                             'D':np.array([0.001]),
-                                             'Q':np.array([0.001]),
-                                             'y':np.array(pred_init_exog[i])}
-                        twelve_x[i] = twelve_x[i].append(dir_update_exog_T, ignore_index=True)
-                    else: twelve_x[i] = twelve_x[i].append(x_update_exog_T, ignore_index=True)
+                    twelve_x[i] = twelve_x[i].append(x_update_exog_T, ignore_index=True)
                 diff_X_exogt = np.array(diff_X_exogt)
 
 
@@ -399,16 +388,15 @@ class MinimalSARIMAX():
 
                             # del 'this time' rows
                             twelve_x[i] = twelve_x[i][twelve_x[i]['Time']!=(save_time-pd.Timedelta(hours=6))]
-
                             for key in li_x_update_exo_tmp:
                                 if (key=='Time'): continue
-                                li_x_update_exo[key] = np.array(li_x_update_exo_tmp[key]).mean()
+                                li_x_update_exo[key] = np.array(li_x_update_exo_tmp[key]).mean(axis=0)
                             
                             error_X_exog[i] = cur_X_exogt[i][-2] - li_x_update_exo['y']
                             
 
                             # learning
-                            if learn:
+                            if learn_exog:
                                 li_x_update_exo['pX'] = 0
                                 model_exo[i].update_params(li_x_update_exo, error_X_exog[i], lr[i+1])
                         
@@ -421,7 +409,6 @@ class MinimalSARIMAX():
                         twelve_x[i] = twelve_x[i].append(x_update_exog[i], ignore_index=True)
                     
                     cur_X_exogt = np.array(cur_X_exogt).reshape((-1, 4))
-                
 
 
                 # then do main thing
