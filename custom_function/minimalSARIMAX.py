@@ -5,6 +5,7 @@ from sklearn.metrics import mean_squared_error
 import random
 import matplotlib.pyplot as plt
 
+
 class MinimalSARIMAX():
     def __init__(self, X_train, order, seasonal_order, exog=None):
         self.X_train = X_train
@@ -12,7 +13,7 @@ class MinimalSARIMAX():
 
         self.p, self.d, self.q = order
         self.P, self.D, self.Q, self.S = seasonal_order
-        
+
         self.params = {}
 
         self.params['p'] = [random.uniform(0, 0.1)]*self.p if self.p else np.zeros(1)
@@ -26,9 +27,9 @@ class MinimalSARIMAX():
         self.params['c'] = random.uniform(0, 0.1)
 
         self.Error_X = None
-    
+
     #############################################################################
-    
+
     def p_prediction(self, X_train, t):
         if (t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.p, 0)
@@ -43,7 +44,7 @@ class MinimalSARIMAX():
         if (t <= 0): return np.zeros(1), np.zeros(1)
         X_train_exog_t = np.array(X_train_exog[t-1])
         params_pX = np.array(self.params['pX'])
-        
+
         pX_pred = X_train_exog_t @ params_pX
 
         return pX_pred, X_train_exog_t
@@ -67,7 +68,7 @@ class MinimalSARIMAX():
         q_pred = error_t @ params_q
 
         return q_pred, error_t[::-1]
-    
+
     #############################################################################
 
     def P_prediction(self, X_train, t):
@@ -77,7 +78,7 @@ class MinimalSARIMAX():
         ss_c = min(ss_c, self.P)
         X_train_ts = np.array(X_train[t-self.S::-self.S]).reshape(-1)[:ss_c]
         params_P = np.array(self.params['P'][::-1])[:ss_c]
-        
+
         P_pred = X_train_ts @ params_P[:X_train_ts.shape[0]]
 
         return P_pred, X_train_ts[::-1]
@@ -89,7 +90,7 @@ class MinimalSARIMAX():
         ss_c = min(ss_c, self.D)
         diff_X_ts = np.array(X_train[t-1-self.S::-self.S]).reshape(-1)[:1]
         params_D = np.array(self.params['D'])
-        
+
         D_pred = diff_X_ts @ params_D[:diff_X_ts.shape[0]]
 
         return D_pred, diff_X_ts[::-1]
@@ -107,7 +108,7 @@ class MinimalSARIMAX():
         return Q_pred, error_ts[::-1]
     
     #############################################################################
-    
+
     def update_params(self, x, error_t, lr):
 
         def param_pad_0(x, size):
@@ -180,12 +181,13 @@ class MinimalSARIMAX():
             Error_X.append(error_X_t)
 
         self.Error_X = Error_X
-        
+
         return self.params
     
     def predict_one(self, X_train, diff_X, t, Error_X=None, X_train_exog=None):
 
-        pred = {} ; x = {}
+        pred = {}
+        x = {}
 
         pred['p'], x['p'] = self.p_prediction(X_train, t-1)
 
@@ -210,34 +212,35 @@ class MinimalSARIMAX():
         else:
             pred['Q'], x['Q'] = (np.zeros(1), np.zeros(1))
 
-        pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] + pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
+        pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] +
+                     pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
 
         return pred['y'], x
 
-   
     #############################################################################
-    
+
     def predict(self, y, y_exog=None, init_pred=[10], init_e=[0], verbose=0, e_flag=False):
         y_t = y.copy().to_numpy()
 
         y_exog_t = None
         if y_exog is not None:
             y_exog_t = y_exog.copy().to_numpy()
-        
+
         diff_y = self.calcDiff(y)
 
         Error = init_e
 
         y_pred = init_pred
 
-        for t in range(1,len(y_t)):
-            pred = {} ; x = {}
+        for t in range(1, len(y_t)):
+            pred = {}
+            x = {}
 
             pred['p'], x['p'] = self.p_prediction(y_t, t)
             pred['pX'], x['pX'] = self.pX_prediction(y_exog_t, t) if y_exog is not None else (np.zeros(1) ,np.zeros(1))
             pred['d'], x['d'] = self.d_prediction(diff_y, t)
             pred['q'], x['q'] = self.q_prediction(Error, t)
-            
+
             pred['P'], x['P'] = self.P_prediction(y_t, t)
             pred['D'], x['D'] = self.D_prediction(y_t, t)
             pred['Q'], x['Q'] = self.Q_prediction(Error, t)
@@ -537,10 +540,10 @@ class MinimalSARIMAX():
     
     def calcDiff(self, X):
         diff = X.copy()
-        diff = diff.iloc[:,0].diff()
+        diff = diff.iloc[:, 0].diff()
         diff = diff.fillna(0)
         return diff.to_numpy()
-    
+
     #############################################################################
     
     def scoring(self, y_test, y_pred):
@@ -551,13 +554,18 @@ class MinimalSARIMAX():
     def RMSE(self, y_test, y_pred):
         rmse = self.scoring(y_test, y_pred)
         print(f'Test on SARIMAX with RMSE: {rmse}')
-    
+
+    def scoring(self, y_test, y_pred):
+        mse = mean_squared_error(y_test, y_pred)
+        return np.sqrt(mse)
+
     #############################################################################
-    
+
     def plot(self, dataset, y_pred, title=""):
-        plt.figure(num=None, figsize=(18, 6), dpi=80, facecolor='w', edgecolor='k')
-        plt.plot(dataset, color='g',label='ground truth')
-        plt.plot(y_pred, alpha=.7, color='r',label='predict')
+        plt.figure(num=None, figsize=(18, 6), dpi=80,
+                   facecolor='w', edgecolor='k')
+        plt.plot(dataset, color='g', label='ground truth')
+        plt.plot(y_pred, alpha=.7, color='r', label='predict')
         plt.title(title)
         plt.legend(loc="upper right")
 
