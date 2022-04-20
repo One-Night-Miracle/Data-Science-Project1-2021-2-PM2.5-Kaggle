@@ -16,20 +16,14 @@ class MinimalSARIMAX():
 
         self.params = {}
 
-        self.params['p'] = [random.uniform(0, 0.1)]*self.p if self.p else [0]
-        self.params['pX'] = [random.uniform(
-            0, 0.1)]*self.X_train_exog.shape[1] if (exog is not None) else [0]
-        self.params['d'] = [random.uniform(0, 0.1)]*self.d if self.d else [0]
-        self.params['q'] = [random.uniform(0, 0.1)]*self.q if self.q else [0]
+        self.params['p'] = [random.uniform(0, 0.1)]*self.p if self.p else np.zeros(1)
+        self.params['pX'] = [random.uniform(0, 0.1)]*self.X_train_exog.shape[1] if (exog is not None) else np.zeros(1)
+        self.params['d'] = [random.uniform(0, 0.1)]*self.d if self.d else np.zeros(1)
+        self.params['q'] = [random.uniform(0, 0.1)]*self.q if self.q else np.zeros(1)
 
-        self.params['P'] = [random.uniform(0, 0.1)]*self.P if self.P else [0]
-        self.params['D'] = [random.uniform(0, 0.1)]*self.D if self.D else [0]
-        self.params['Q'] = [random.uniform(0, 0.1)]*self.Q if self.Q else [0]
-        self.params['c'] = random.uniform(0, 0.1)
-
-        self.params['P'] = [random.uniform(0, 0.1)]*self.P if self.P else [0]
-        self.params['D'] = [random.uniform(0, 0.1)]*self.D if self.D else [0]
-        self.params['Q'] = [random.uniform(0, 0.1)]*self.Q if self.Q else [0]
+        self.params['P'] = [random.uniform(0, 0.1)]*self.P if self.P else np.zeros(1)
+        self.params['D'] = [random.uniform(0, 0.1)]*self.D if self.D else np.zeros(1)
+        self.params['Q'] = [random.uniform(0, 0.1)]*self.Q if self.Q else np.zeros(1)
         self.params['c'] = random.uniform(0, 0.1)
 
         self.Error_X = None
@@ -37,18 +31,18 @@ class MinimalSARIMAX():
     #############################################################################
 
     def p_prediction(self, X_train, t):
+        if (t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.p, 0)
-        X_train_t = np.array(X_train[start:t])[::-1].reshape((-1))
-
+        X_train_t = np.array(X_train[start:t])[::-1]
         params_p = np.array(self.params['p'][:t-start])[::-1]
+
         p_pred = X_train_t @ params_p[:X_train_t.shape[0]]
 
         return p_pred, X_train_t[::-1]
 
     def pX_prediction(self, X_train_exog, t):
-        if (t <= 0):
-            return [0], [0]
-        X_train_exog_t = np.array(X_train_exog[t-1]).reshape((-1))
+        if (t <= 0): return np.zeros(1), np.zeros(1)
+        X_train_exog_t = np.array(X_train_exog[t-1])
         params_pX = np.array(self.params['pX'])
 
         pX_pred = X_train_exog_t @ params_pX
@@ -56,10 +50,9 @@ class MinimalSARIMAX():
         return pX_pred, X_train_exog_t
 
     def d_prediction(self, diff_X, t):
-        if (self.d == 0):
-            return [0], [0]
+        if (self.d == 0 or t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.d, 0)
-        diff_X_t = np.array(diff_X[start:t])[::-1].reshape((-1))
+        diff_X_t = np.array(diff_X[start:t])[::-1]
         params_d = np.array(self.params['d'][:t-start])[::-1]
 
         d_pred = diff_X_t @ params_d[:diff_X_t.shape[0]]
@@ -67,8 +60,9 @@ class MinimalSARIMAX():
         return d_pred, diff_X_t[::-1]
 
     def q_prediction(self, Error, t):
+        if (self.q == 0 or t <= 0): return np.zeros(1), np.zeros(1)
         start = max(t-self.q, 0)
-        error_t = np.array(Error[start:t])[::-1].reshape((-1))
+        error_t = np.array(Error[start:t]).ravel()[::-1]
         params_q = np.array(self.params['q'][:t-start])[::-1]
 
         q_pred = error_t @ params_q
@@ -79,10 +73,10 @@ class MinimalSARIMAX():
 
     def P_prediction(self, X_train, t):
         ss_c = t//self.S  # season_count
-        if (ss_c == 0 or self.params['P'] == [0]):
-            return [0], [0]
+        if (ss_c == 0 or self.params['P'] == np.zeros(1) or t <= 0):
+            return np.zeros(1) ,np.zeros(1)
         ss_c = min(ss_c, self.P)
-        X_train_ts = np.array(X_train[t-self.S::-self.S])[:ss_c].reshape((-1))
+        X_train_ts = np.array(X_train[t-self.S::-self.S]).reshape(-1)[:ss_c]
         params_P = np.array(self.params['P'][::-1])[:ss_c]
 
         P_pred = X_train_ts @ params_P[:X_train_ts.shape[0]]
@@ -91,10 +85,10 @@ class MinimalSARIMAX():
 
     def D_prediction(self, X_train, t):
         ss_c = t-1//self.S  # season_count
-        if (ss_c == 0 or self.params['D'] == [0]):
-            return [0], [0]
-        ss_c = min(ss_c, self.P)
-        diff_X_ts = np.array(X_train[t-1-self.S::-self.S])[:1].reshape((-1))
+        if (ss_c == 0 or self.params['D'] == np.zeros(1) or t <= 0):
+            return np.zeros(1) ,np.zeros(1)
+        ss_c = min(ss_c, self.D)
+        diff_X_ts = np.array(X_train[t-1-self.S::-self.S]).reshape(-1)[:1]
         params_D = np.array(self.params['D'])
 
         D_pred = diff_X_ts @ params_D[:diff_X_ts.shape[0]]
@@ -103,51 +97,59 @@ class MinimalSARIMAX():
 
     def Q_prediction(self, Error, t):
         ss_c = t//self.S  # season_count
-        if (ss_c == 0 or len(self.params['Q']) == 0):
-            return [0], [0]
-        ss_c = min(ss_c, self.P)
-        error_ts = np.array(Error[t-self.S::-self.S])[:ss_c].ravel()
+        if (ss_c == 0 or len(self.params['Q']) == np.zeros(1) or t <= 0):
+            return np.zeros(1) ,np.zeros(1)
+        ss_c = min(ss_c, self.Q)
+        error_ts = np.array(Error[t-self.S::-self.S]).reshape(-1)[:ss_c]
         params_Q = np.array(self.params['Q'][::-1])[:ss_c]
 
         Q_pred = error_ts @ params_Q[:error_ts.shape[0]]
 
         return Q_pred, error_ts[::-1]
-
+    
     #############################################################################
 
     def update_params(self, x, error_t, lr):
 
         def param_pad_0(x, size):
-            if (size == 0):
+            if (size==0 or len(x)==0):
                 return np.zeros(1)
-            x = np.array(x)
+            x = np.array(x).ravel()
             result = np.zeros(size)
             result[:x.shape[0]] = x
             return result
 
-        self.params['p'] += param_pad_0(x['p'], self.p) * error_t * lr
 
-        self.params['pX'] += np.array(x['pX']) * error_t * lr
+        if 'p' in x:       
+            self.params['p'] += param_pad_0(x['p'], self.p) * error_t * lr
 
-        self.params['d'] += param_pad_0(x['d'], self.d) * error_t * lr
+        if 'pX' in x: 
+            self.params['pX'] += np.array(x['pX']) * error_t * lr
 
-        self.params['q'] += param_pad_0(x['q'], self.q) * error_t * lr
+        if 'd' in x: 
+            self.params['d'] += param_pad_0(x['d'], self.d) * error_t * lr
 
-        self.params['P'] += param_pad_0(x['P'], self.P) * error_t * lr
+        if 'q' in x: 
+            self.params['q'] += param_pad_0(x['q'], self.q) * error_t * lr
 
-        self.params['D'] += param_pad_0(x['D'], self.D) * error_t * lr
+        if 'P' in x: 
+            self.params['P'] += param_pad_0(x['P'], self.P) * error_t * lr
 
-        self.params['Q'] += param_pad_0(x['Q'], self.Q) * error_t * lr
+        if 'D' in x: 
+            self.params['D'] += param_pad_0(x['D'], self.D) * error_t * lr
 
+        if 'Q' in x: 
+            self.params['Q'] += param_pad_0(x['Q'], self.Q) * error_t * lr
+        
         self.params['c'] += 1 * error_t * lr
 
     #############################################################################
 
-    def fit(self, verbose=0, lr=1e-5, lr_decay=0.999):
+    def fit(self, lr=1e-6, lr_decay=0.999, verbose=0):
         tqdm_disable = False
         if (verbose==0): tqdm_disable=True
 
-        X_train = self.X_train.iloc[:, 0].copy().to_numpy()
+        X_train = self.X_train.iloc[:,0].copy().to_numpy()
 
         X_train_exog = None
         if self.X_train_exog is not None:
@@ -155,59 +157,65 @@ class MinimalSARIMAX():
 
         diff_X = self.calcDiff(self.X_train)
 
-        Error_X = [0]
+        Pred = [0]
+
+        Error_X = [X_train[0]]
+
+        last_x = {'p':[0],'pX':[0],'d':[0],'q':[0],'P':[0],'D':[0],'Q':[0]}
 
         for t in tqdm(range(1, X_train.shape[0]), disable=tqdm_disable):
             lr *= lr_decay
 
-            pred, x, error_X_t = self.predict_one(
-                X_train, diff_X, t, Error_X, X_train_exog=X_train_exog)
+            self.update_params(last_x, Error_X[-1], lr)
 
-            # error_X_t = X_train[t-1] - pred['y']
+            new_pred, new_x = self.predict_one(
+                X_train, diff_X, t, Error_X, X_train_exog=X_train_exog)
+            
+            Pred.append(new_pred)
+            error_X_t = X_train[t] - new_pred
+            last_x = new_x
 
             if (verbose):
-                print(t, pred['y'], X_train[t], error_X_t, lr)
+                print(t, new_pred, X_train[t], error_X_t, lr)
 
             Error_X.append(error_X_t)
-
-            self.update_params(x, error_X_t, lr)
 
         self.Error_X = Error_X
 
         return self.params
-
-    def predict_one(self, X_train, diff_X, t, Error_X=None, X_train_exog=None, model_out=None):
-
-        if model_out is None:
-            model_out = self
+    
+    def predict_one(self, X_train, diff_X, t, Error_X=None, X_train_exog=None):
 
         pred = {}
         x = {}
 
-        pred['p'], x['p'] = model_out.p_prediction(X_train, t)
+        pred['p'], x['p'] = self.p_prediction(X_train, t-1)
 
-        if (X_train_exog is None or not X_train_exog.all()):
-            pred['pX'], x['pX'] = ([0], [0])
+        # if (X_train_exog is not None and len(X_train_exog)):
+        if (X_train_exog is not None and X_train_exog!=[[]]*4 and len(X_train_exog)):
+            pred['pX'], x['pX'] = self.pX_prediction(X_train_exog, t-1) 
         else:
-            # print(X_train_exog)
-            pred['pX'], x['pX'] = model_out.pX_prediction(X_train_exog, t) 
+            pred['pX'], x['pX'] = (np.zeros(1), np.zeros(1))
+         
+        pred['d'], x['d'] = self.d_prediction(diff_X, t-1)
+        
+        if (Error_X is None or len(Error_X)<2):
+            pred['q'], x['q'] = (np.zeros(1), np.zeros(1))
+        else:
+            pred['q'], x['q'] = self.q_prediction(np.array(Error_X), t-1)
             
+        pred['P'], x['P'] = self.P_prediction(X_train, t-1)
+        pred['D'], x['D'] = self.D_prediction(X_train, t-1)
 
-        pred['d'], x['d'] = model_out.d_prediction(diff_X, t)
-        pred['q'], x['q'] = model_out.q_prediction(
-            Error_X, t) if Error_X is not None else ([0], [0])
-
-        pred['P'], x['P'] = model_out.P_prediction(X_train, t)
-        pred['D'], x['D'] = model_out.D_prediction(X_train, t)
-        pred['Q'], x['Q'] = model_out.Q_prediction(
-            Error_X, t) if Error_X is not None else ([0], [0])
+        if (Error_X is not None and ('Q' in x) and len(x['Q'])):
+            pred['Q'], x['Q'] = self.Q_prediction(np.array(Error_X), t-1)
+        else:
+            pred['Q'], x['Q'] = (np.zeros(1), np.zeros(1))
 
         pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] +
                      pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
 
-        error_X_t = X_train[t-1] - pred['y']
-
-        return pred, x, error_X_t
+        return pred['y'], x
 
     #############################################################################
 
@@ -229,7 +237,7 @@ class MinimalSARIMAX():
             x = {}
 
             pred['p'], x['p'] = self.p_prediction(y_t, t)
-            pred['pX'], x['pX'] = self.pX_prediction(y_exog_t, t) if y_exog is not None else ([0], [0])
+            pred['pX'], x['pX'] = self.pX_prediction(y_exog_t, t) if y_exog is not None else (np.zeros(1) ,np.zeros(1))
             pred['d'], x['d'] = self.d_prediction(diff_y, t)
             pred['q'], x['q'] = self.q_prediction(Error, t)
 
@@ -237,9 +245,8 @@ class MinimalSARIMAX():
             pred['D'], x['D'] = self.D_prediction(y_t, t)
             pred['Q'], x['Q'] = self.Q_prediction(Error, t)
 
-            pred['y'] = (pred['p'] + pred['pX'] + pred['d'] + pred['q'] +
-                         pred['P'] + pred['Q'] + pred['D'] + self.params['c']).sum()
-
+            pred['y'] = np.nansum(pred['p'] + pred['pX'] + pred['d'] + pred['q'] + pred['P'] + pred['Q'] + pred['D'] + self.params['c'])
+            
             y_pred.append(pred['y'])
 
             error_t = (y_t[t] - pred['y']).sum()
@@ -251,338 +258,286 @@ class MinimalSARIMAX():
 
         col_name = y.columns.values[0]
         df = pd.DataFrame({col_name:y_pred[-y.shape[0]:]},index=y.index)
-    
-        # display(df)
-        # print('finised!')
 
         if e_flag:
             return Error
 
         return df, Error
+    
+    #############################################################################
 
-    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, model_pd=None, step=12, learn=False, lr=5e-6, lr_decay=0.999):
+    def predict_step(self, val_X, y, val_X_exog=None, y_exog=None, model_exog=None, step=12, n_iter=1, learn=False, learn_exog=False, lr=np.array([1e-7]), lr_decay=0.95, lr_decay_iter=1, verbose=0, verbose_rmse=1):
+        def ReLU(x):
+            return np.maximum(0, x)
+
+        lr_copy = lr.copy()
+
         exog_flag = False
         if val_X_exog is not None:
             exog_flag = True
             model_exo = []
             for key in model_exog:
                 model_exo.append(model_exog[key])
+        
+#         for iter in tqdm(range(n_iter)):
+        for iter in range(n_iter):
+            if iter>0:
+                lr *= lr_copy*lr_decay_iter
 
-        save_time_v = val_X.index[0]
+            save_time = val_X.index[0]
+            start_time_y = y.index[0]
 
-        save_time_y = y.index[0]
-        end_time_y = y.index[-1]
+            end_time_y = y.index[-1]
+            
+            pred_sav = None
+            y_pred_sav = None
+            pred_sav = pd.DataFrame(columns=['Time','Predict', 'Actual'])
+            y_pred_sav = pd.DataFrame(columns=['Time','Predict', 'Actual'])
+            
+            ## random init
+            pred_init = random.randint(5,10)
+            pred_init_exog = np.array([30, 25, 5, 5])
 
-        val_pred_sav = pd.DataFrame(columns=['Time', 'Predict', 'Actual'])
-        y_pred_sav = pd.DataFrame(columns=['Time', 'Predict', 'Actual'])
+            # initialize variables
+            val_Xt = pd.concat([val_X.iloc[:,0].copy(),y.iloc[:,0].copy()]).to_numpy()
+            diff_Xt = self.calcDiff(pd.concat([val_X.copy(),y.copy()]))
+            Error_X = [val_Xt[0] - pred_init]
+            Error_sav = [val_Xt[0] - pred_init]
 
-        # random init
-        pred_init = random.randint(5, 20)
-        pred_init_exog = [30, 25, 180]
+            twelve = None
+            twelve = pd.DataFrame(columns=['Time','p','pX','d','q','P','D','Q','y'])
 
-        # initialize val variables
-        val_Xt = val_X.iloc[:, 0].copy().to_numpy()
-        diff_Xt = self.calcDiff(val_X)
-        Error_X = [val_Xt[0] - pred_init]
+            x_update_T = {'Time':save_time,
+                          'p':np.array([0.01]),
+                          'pX':np.array([0.01])*4,
+                          'd':np.array([0.01]),
+                          'q':np.array([0.01]),
+                          'P':np.array([0.01]),
+                          'D':np.array([0.01]),
+                          'Q':np.array([0.01]),
+                          'y':pred_init}
 
-        Valid_Error = [val_Xt[0] - pred_init]
+            twelve = twelve.append(x_update_T, ignore_index=True)
 
-        # initialize val_exog variables
-        val_X_exogt = None
-        diff_X_exogt = []
-        Error_X_exogt = []
-        if exog_flag:
-            val_X_exogt = val_X_exog.copy().to_numpy()
-            for i in range(3):
-                diff_X_exogt.append(self.calcDiff(val_X_exog.iloc[:, [i]]))
-                Error_X_exogt.append([val_X_exogt[0][i] - pred_init_exog[i]])
-            diff_X_exogt = np.array(diff_X_exogt)
-
-        # save to DF
-        sav_item = {'Time': save_time_v,
-                    'Predict': pred_init,
-                    'Actual': val_Xt[0]}
-        val_pred_sav = val_pred_sav.append(
-            sav_item, ignore_index=True, sort=False)
-        save_time_v += pd.Timedelta(hours=6)
-
-        for t in range(1, len(val_Xt)):
-            # limit viewing
-            cur_Xt = val_Xt[:t]
-            cur_diff_Xt = diff_Xt[:t]
-
-            # do exog first
-            cur_X_exogt = []
-            cur_diff_X_exogt = []
-            pred_exog = [0]*3
-            x_update_exog = [0]*3
-            error_X_exog = [0]*3
+            ## initialize variables
+            val_X_exogt = None
+            diff_X_exogt = []
+            Error_X_exogt = []
             if exog_flag:
-                for i in range(3):
-                    cur_X_exogt.append(val_X_exogt[:t, i])
-                    cur_diff_X_exogt.append(diff_X_exogt[i, :t])
+                val_X_exogt = pd.concat([val_X_exog.copy(),y_exog.copy()]).to_numpy()
+                twelve_x = None
+                twelve_x = [pd.DataFrame(columns=['Time','p','pX','d','q','P','D','Q','y'])]*4
+                
+                for i in range(4):
+                    x_update_exog_T = {'Time':save_time,
+                                       'p':np.array([0.01]),
+                                       'pX':[],
+                                       'd':np.array([0.01]),
+                                       'q':np.array([0.01]),
+                                       'P':np.array([0.01]),
+                                       'D':np.array([0.01]),
+                                       'Q':np.array([0.01]),
+                                       'y':np.array(pred_init_exog[i])}
+                    diff_X_exogt.append(self.calcDiff(val_X_exog.iloc[:,[i]]))
+                    Error_X_exogt.append([val_X_exogt[0] - pred_init_exog[i]])
+                    twelve_x[i] = twelve_x[i].append(x_update_exog_T, ignore_index=True)
+                diff_X_exogt = np.array(diff_X_exogt)
 
-                    # print(i,t,cur_X_exogt[i])
-                    pred_exog[i], x_update_exog[i], error_X_exog[i] = self.predict_one(
-                        cur_X_exogt[:][i], cur_diff_X_exogt[i], t, Error_X_exogt[i], model_out=model_exo[i])
-
-                    # learning
-                    if learn:
-                        model_exo[i].update_params(
-                            x_update_exog[i], error_X_exog[i], lr)
-
-                    # append Error
-                    Error_X_exogt[i].append(error_X_exog[i])
-                cur_X_exogt = np.array(cur_X_exogt).reshape((-1, 3))
-
-            # then do main thing
-            pred, x_update, error_X = self.predict_one(
-                cur_Xt, cur_diff_Xt, t, Error_X, X_train_exog=cur_X_exogt, model_out=model_pd)
-
-            # learning
-            if learn:
-                self.update_params(x_update, error_X, lr)
-
-            # append Error
-            Error_X.append(error_X)
-            Valid_Error.append(error_X)
 
             # save to DF
-            sav_item = {'Time': save_time_v,
-                        'Predict': pred['y'],
-                        'Actual': val_Xt[t]}
-            val_pred_sav = val_pred_sav.append(
-                sav_item, ignore_index=True, sort=False)
-            save_time_v += pd.Timedelta(hours=6)
+            sav_item = {'Time': save_time,
+                        'Predict': pred_init,
+                        'Actual': val_Xt[0]}
+            pred_sav = pred_sav.append(sav_item, ignore_index=True, sort=False)
+            save_time += pd.Timedelta(hours=6)
 
-            # change at a new 't'
-            save_time_v_sub = save_time_v
 
-            cur_pred = [pred['y']]
-            diff_cur_pred = [pred['y'] - cur_Xt[-1]]
-
-            # exog too
-            cur_pred_X_exogt = []
-            cur_pred_diff_X_exogt = []
-            if exog_flag:
-                for i in range(3):
-                    cur_pred_X_exogt.append([pred_exog[i]['y']])
-                    cur_pred_diff_X_exogt.append(
-                        [pred_exog[i]['y'] - cur_X_exogt[-1][i]])
-
-            for s in range(1, step):
+            for t in tqdm(range(1, len(val_Xt)), disable=(verbose==0)):
+#             for t in range(1, len(val_Xt)):
                 if learn:
                     lr *= lr_decay
+                    lr = np.maximum(lr, 0.1*lr_copy)
 
-                cur_X_s = list(cur_Xt) + cur_pred
+                # if t%100==0:
+                #     rmse = ((np.array(Error_sav)**2).mean())**(1/2)
+                #     print(rmse)
 
-                # append diff
-                diff_Xt_s = list(cur_diff_Xt) + diff_cur_pred
-                diff_Xt_s.append(cur_X_s[-1] - cur_X_s[-2])
+                # limit viewing
+                cur_Xt = val_Xt[:t]
+                cur_diff_Xt = diff_Xt[:t]
 
                 # do exog first
-                cur_X_exog_s = [[]]*3
-                cur_diff_X_exog_s = [[]]*3
-                pred_exog = [0]*3
-                x_update_exog = [0]*3
-                error_X_exog = [0]*3
+                cur_X_exogt = [[]]*4
+                cur_diff_X_exogt = []
+                
+                error_X_exog = [0]*4
                 if exog_flag:
-                    for i in range(3):
-                        cur_X_exog_s[i] = list(
-                            cur_X_exogt[:, i]) + list(cur_pred_X_exogt[i])
+                    pred_exog = [0]*4
+                    x_update_exog = [x_update_exog_T]*4
+                    for i in range(4):
+                        cur_X_exogt[i] = list(val_X_exogt[:, i])
 
-                        # append diff
-                        cur_diff_X_exog_s[i] = list(
-                            cur_diff_X_exogt[i]) + cur_pred_diff_X_exogt[i]
-                        cur_diff_X_exog_s[i].append(
-                            cur_X_exog_s[i][-1] - cur_X_exog_s[i][-2])
+                        cur_diff_X_exogt.append(diff_X_exogt[i, :t])
 
-                        pred_exog[i], x_update_exog[i], error_X_exog[i] = self.predict_one(
-                            cur_X_exog_s[i], cur_diff_X_exog_s[i], t, model_out=model_exo[i])
+                        # input 't' to predict 't-1'
+                        pred_exog[i], x_update_exog[i] = model_exo[i].predict_one(cur_X_exogt[i], cur_diff_X_exogt[i], t+1, Error_X_exogt[i])
 
-                        cur_pred_X_exogt[i].append(pred_exog[i]['y'])
+                        error_X_exog[i] = 0
 
-                        # learning
-                        if learn:
-                            model_exo[i].update_params(
-                                x_update_exog[i], error_X_exog[i], lr)
+                        if (t >= step+1):
+                            li_x_update_exo_tmp = twelve_x[i][twelve_x[i]['Time']==(save_time-pd.Timedelta(hours=6))].copy()
+                            
+                            li_x_update_exo = {'Time':save_time-pd.Timedelta(hours=6)}
+
+                            # del 'this time' rows
+                            twelve_x[i] = twelve_x[i][twelve_x[i]['Time']!=(save_time-pd.Timedelta(hours=6))]
+                            for key in li_x_update_exo_tmp:
+                                if (key=='Time'): continue
+                                li_x_update_exo[key] = np.array(li_x_update_exo_tmp[key]).mean(axis=0)
+                            
+                            error_X_exog[i] = cur_X_exogt[i][-2] - li_x_update_exo['y']
+                            
+
+                            # learning
+                            if learn_exog:
+                                li_x_update_exo['pX'] = 0
+                                model_exo[i].update_params(li_x_update_exo, error_X_exog[i], lr[i+1])
+                        
+                        # append Error
+                        Error_X_exogt[i].append(error_X_exog[i])
+                            
+
+                        x_update_exog[i]['Time'] = save_time
+                        x_update_exog[i]['y'] = pred_exog[i]
+                        twelve_x[i] = twelve_x[i].append(x_update_exog[i], ignore_index=True)
+                    
+                    cur_X_exogt = np.array(cur_X_exogt).reshape((-1, 4))
+
 
                 # then do main thing
-                pred, x_update, error_X = self.predict_one(
-                    cur_X_s, diff_Xt_s, t+s, X_train_exog=np.moveaxis(cur_X_exog_s, -1, 0), model_out=model_pd)
+                # input 't' to predict 't-1'
+                # print(cur_X_exogt.shape)
+                pred, x_update = self.predict_one(cur_Xt, cur_diff_Xt, t+1, Error_X, X_train_exog=cur_X_exogt)
 
-                # learning 11 steps
-                if learn:
-                    self.update_params(x_update, error_X, lr)
+                error_X = 0
+                
+                if (t >= step+1):
+                    li_x_update_tmp = twelve[twelve['Time']==save_time-pd.Timedelta(hours=6)]
 
-                # append Error
-                Valid_Error.append(error_X)
+                    # del 'this time' rows
+                    twelve = twelve[twelve['Time']!=save_time-pd.Timedelta(hours=6)]
+                    
+                    li_x_update = {'Time':save_time-pd.Timedelta(hours=6)}
 
-                cur_pred.append(pred['y'])
+                    for key in li_x_update_tmp:
+                        if (key=='Time'): continue
+                        li_x_update[key] = np.array(li_x_update_tmp[key]).mean(axis=0)
 
-                # save to DF
-                if (save_time_v_sub < save_time_y):
-                    sav_item = {'Time': save_time_v_sub,
-                                'Predict': pred['y'],
-                                'Actual': val_Xt[t+s]}
-                    val_pred_sav = val_pred_sav.append(
-                        sav_item, ignore_index=True, sort=False)
-                save_time_v_sub += pd.Timedelta(hours=6)
-
-        # initialize y variables
-        yt = y.iloc[:, 0].copy().to_numpy()
-        diff_yt = self.calcDiff(y)
-        Error_y = Error_X + [yt[0] - list(val_Xt)[-1]]
-
-        Test_Error = [yt[0] - list(val_Xt)[-1]]
-
-        # initialize y_exog variables
-        y_exogt = None
-        diff_y_exogt = []
-        Error_y_exogt = [[]]*3
-        if exog_flag:
-            y_exogt = y_exog.copy().to_numpy()
-            for i in range(3):
-                diff_y_exogt.append(self.calcDiff(y_exog.iloc[:, [i]]))
-                Error_y_exogt[i] = Error_X_exogt[i] + \
-                    [y_exogt[0][i] - val_X_exogt[0][i]]
-            diff_y_exogt = np.array(diff_y_exogt)
-
-        # save to DF
-        # sav_item = {'Time': save_time_v,
-        #             'Predict': pred_init,
-        #             'Actual': val_Xt[0]}
-        # val_pred_sav = val_pred_sav.append(
-        #     sav_item, ignore_index=True, sort=False)
-        # save_time_v += pd.Timedelta(hours=6)
-
-        for t in range(val_Xt.shape[0], val_Xt.shape[0] + y.shape[0]):
-            # limit viewing
-            cur_yt = (list(val_Xt) + list(yt))[:t]
-            cur_diff_yt = (list(diff_Xt) + list(diff_yt))[:t]
-
-            # do exog first
-            cur_y_exogt = []
-            cur_diff_y_exogt = []
-            pred_exog = [0]*3
-            y_update_exog = [0]*3
-            error_y_exog = [0]*3
-            if exog_flag:
-                for i in range(3):
-                    cur_y_exogt.append(
-                        list(val_Xt) + list(y_exogt[:t-val_Xt.shape[0], i]))
-                    cur_diff_y_exogt.append(
-                        list(diff_Xt) + list(diff_y_exogt[i, :t-val_Xt.shape[0]]))
-                    # print(t,i,(cur_y_exogt[i]).shape)
-                    pred_exog[i], y_update_exog[i], error_y_exog[i] = self.predict_one(
-                        cur_y_exogt[i], cur_diff_y_exogt[i], t, Error_y_exogt[i], model_out=model_exo[i])
-
+                    error_X = cur_Xt[-2] - li_x_update['y']
+                    
                     # learning
                     if learn:
-                        model_exo[i].update_params(
-                            y_update_exog[i], error_y_exog[i], lr)
-
-                    # append Error
-                    Error_y_exogt[i].append(error_y_exog[i])
-                cur_y_exogt = np.array(cur_y_exogt).reshape((-1, 3))
-
-            # then do main thing
-            pred_t, y_update, error_y = self.predict_one(
-                cur_yt, cur_diff_yt, t, Error_y, X_train_exog=cur_y_exogt, model_out=model_pd)
-
-            # learning
-            if learn:
-                self.update_params(y_update, error_y, lr)
-
-            # append Error
-            Error_y.append(error_y)
-            Test_Error.append(error_y)
-
-            # save to DF
-            sav_item = {'Time': save_time_y,
-                        'Predict': pred_t['y'],
-                        'Actual': yt[t-val_Xt.shape[0]]}
-            y_pred_sav = y_pred_sav.append(
-                sav_item, ignore_index=True, sort=False)
-            save_time_y += pd.Timedelta(hours=6)
-
-            # change at a new 't'
-            save_time_y_sub = save_time_y
-
-            cur_pred = [pred_t['y']]
-            diff_cur_pred = [pred_t['y']-cur_Xt[-1]]
-
-            # exog too
-            cur_pred_y_exogt = []
-            cur_pred_diff_y_exogt = []
-            if exog_flag:
-                for i in range(3):
-                    cur_pred_y_exogt.append([pred_exog[i]['y']])
-                    cur_pred_diff_y_exogt.append(
-                        [pred_exog[i]['y'] - cur_y_exogt[-1][i]])
-
-            for s in range(1, step):
-                if learn:
-                    lr *= lr_decay
-
-                cur_yt_s = list(cur_yt) + cur_pred
-
-                # append diff
-                diff_yt_s = list(diff_yt) + diff_cur_pred
-                diff_yt_s.append(cur_yt_s[-1]-cur_yt_s[-2])
-
-                # do exog first
-                cur_y_exog_s = [[]]*3
-                cur_diff_y_exog_s = [[]]*3
-                pred_exog = [0]*3
-                y_update_exog = [0]*3
-                error_y_exog = [0]*3
-                if exog_flag:
-                    for i in range(3):
-                        cur_y_exog_s[i] = list(
-                            cur_y_exogt[:, i]) + list(cur_pred_y_exogt[i])
-
-                        # append diff
-                        cur_diff_y_exog_s[i] = list(
-                            cur_diff_y_exogt[i]) + cur_pred_diff_y_exogt[i]
-                        cur_diff_y_exog_s[i].append(
-                            cur_y_exog_s[i][-1] - cur_y_exog_s[i][-2])
-
-                        pred_exog[i], y_update_exog[i], error_y_exog[i] = self.predict_one(
-                            cur_y_exog_s[i], cur_diff_y_exog_s[i], t, model_out=model_exo[i])
-
-                        cur_pred_y_exogt[i].append(pred_exog[i]['y'])
-
-                        # learning
-                        if learn:
-                            model_exo[i].update_params(
-                                y_update_exog[i], error_y_exog[i], lr)
-
-                # then do main thing
-                pred, y_update, error_y = self.predict_one(
-                    cur_yt_s, diff_yt_s, t+s, X_train_exog=np.moveaxis(cur_y_exog_s, -1, 0), model_out=model_pd)
-
-                # learning 11 steps
-                if learn:
-                    self.update_params(y_update, error_y, lr)
-
+                        self.update_params(li_x_update, error_X, lr[0])
+                    
                 # append Error
-                Test_Error.append(error_y)
-
-                cur_pred.append(pred['y'])
-
+                Error_X.append(error_X)
+                Error_sav.append(error_X)
+                
+                x_update['Time'] = save_time
+                x_update['y'] = pred
+                twelve = twelve.append(x_update, ignore_index=True)
+            
                 # save to DF
-                if (save_time_y_sub <= end_time_y and
-                        t+s-val_Xt.shape[0] < y.shape[0]):
-                    sav_item = {'Time': save_time_y_sub,
-                                'Predict': pred['y'],
-                                'Actual': yt[t+s-val_Xt.shape[0]]}
-                    y_pred_sav = y_pred_sav.append(
-                        sav_item, ignore_index=True, sort=False)
-                    save_time_y_sub += pd.Timedelta(hours=6)
+                sav_item = {'Time': save_time,
+                            'Predict': ReLU(pred),
+                            'Actual': val_Xt[t]}
+                if (save_time < start_time_y):
+                    pred_sav = pred_sav.append(sav_item, ignore_index=True, sort=False)
+                elif (start_time_y <= save_time and save_time <= end_time_y):
+                    y_pred_sav = y_pred_sav.append(sav_item, ignore_index=True, sort=False)
+                
+                save_time += pd.Timedelta(hours=6)
+            
+                # change at a new 't'
+                save_time_sub = save_time
 
-        return (val_pred_sav, y_pred_sav, np.array(Valid_Error), np.array(Test_Error))
+                cur_pred = [pred]
+                diff_cur_pred = [pred - cur_Xt[-1]]
 
+                # exog too
+                cur_pred_X_exogt = []
+                cur_pred_diff_X_exogt = []
+                if exog_flag:
+                    for i in range(4):
+                        cur_pred_X_exogt.append([pred_exog[i]])
+                        cur_pred_diff_X_exogt.append([pred_exog[i] - cur_X_exogt[-1][i]])
+
+
+                for s in range(1, step):
+                    
+                    cur_X_s = list(cur_Xt) + cur_pred
+                    
+                    # append diff
+                    diff_Xt_s = list(cur_diff_Xt) + diff_cur_pred
+                    diff_Xt_s.append(cur_X_s[-1] - cur_X_s[-2])
+
+                    # do exog first
+                    cur_X_exog_s = [[]]*4
+                    cur_diff_X_exog_s = [[]]*4
+                    
+                    if exog_flag:
+                        pred_exog = [0]*4 ; x_update_exog = [x_update_exog_T]*4 ; error_X_exog = [0]*4
+                        for i in range(4):
+                            cur_X_exog_s[i] = list(cur_X_exogt[:, i]) + list(cur_pred_X_exogt[i])
+
+                            # append diff
+                            cur_diff_X_exog_s[i] = list(cur_diff_X_exogt[i]) + cur_pred_diff_X_exogt[i]
+
+                            cur_diff_X_exog_s[i].append(cur_X_exog_s[i][-1] - cur_X_exog_s[i][-2])
+
+                            # input 't' to predict 't-1'
+                            pred_exog[i], x_update_exog[i] = model_exo[i].predict_one(cur_X_exog_s[i], cur_diff_X_exog_s[i], t+1)
+
+                            cur_pred_X_exogt[i].append(pred_exog[i])
+                                
+                            x_update_exog[i]['Time'] = save_time_sub
+                            x_update_exog[i]['y'] = pred_exog[i]
+                            twelve_x[i] = twelve_x[i].append(x_update_exog[i], ignore_index=True)
+
+
+                    # then do main thing
+                    # input 't' to predict 't-1'
+                    pred, x_update = self.predict_one(cur_X_s, diff_Xt_s, t+s+1, X_train_exog=np.moveaxis(cur_X_exog_s, -1, 0))
+
+                    x_update['Time'] = save_time_sub
+                    x_update['y'] = pred
+                    twelve = twelve.append(x_update, ignore_index=True)
+
+                    # save to DF
+                    if (t+s<val_Xt.shape[0]):
+                        sav_item = {'Time': save_time_sub,
+                                    'Predict': ReLU(pred),
+                                    'Actual': val_Xt[t+s]}
+                        if (save_time_sub < start_time_y):
+                            pred_sav = pred_sav.append(sav_item, ignore_index=True, sort=False)
+                        elif (start_time_y <= save_time_sub and save_time_sub <= end_time_y):
+                            y_pred_sav = y_pred_sav.append(sav_item, ignore_index=True, sort=False)
+                    
+                    save_time_sub += pd.Timedelta(hours=6)
+                    
+                    cur_pred.append(pred)
+
+            if verbose_rmse:
+                rmse = ((np.array(Error_sav)**2).mean())**(1/2)
+                print(f"ITER#{iter}  RMSE:{rmse}")
+            
+            
+        
+
+        return  (pred_sav, y_pred_sav, np.array(Error_sav))
+
+    #############################################################################
+    
     def calcDiff(self, X):
         diff = X.copy()
         diff = diff.iloc[:, 0].diff()
@@ -590,6 +545,11 @@ class MinimalSARIMAX():
         return diff.to_numpy()
 
     #############################################################################
+    
+    def scoring(self, y_test, y_pred):
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = np.sqrt(mse)
+        return rmse
 
     def RMSE(self, y_test, y_pred):
         rmse = self.scoring(y_test, y_pred)
